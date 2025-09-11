@@ -61,16 +61,14 @@ export default function HomeClient() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const isValid = Array.from(files).every(
-      (file) =>
-        file.type === "text/plain" ||
-        file.type === "application/pdf" ||
-        file.type ===
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-        file.name.toLowerCase().endsWith(".txt") ||
-        file.name.toLowerCase().endsWith(".pdf") ||
-        file.name.toLowerCase().endsWith(".docx")
-    );
+    const isValid = Array.from(files).every((file) => {
+      const name = file.name.toLowerCase();
+      return (
+        name.endsWith(".txt") ||
+        name.endsWith(".pdf") ||
+        name.endsWith(".docx")
+      );
+    });
 
     if (!isValid) {
       alert("Only .txt, .pdf or .docx files are allowed.");
@@ -81,10 +79,15 @@ export default function HomeClient() {
     const file = files[0];
     try {
       setIsUploading(true);
-	  setMessages(prev => [
-		...prev,
-		{ id: crypto.randomUUID(), role: "assistant", content: "📂 Uploading your file…" }
-	  ]);
+      const uploadingId = crypto.randomUUID();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uploadingId,
+          role: "assistant",
+          content: "📂 Uploading your file…",
+        },
+      ]);
       const formData = new FormData();
       formData.append("file", file);
 
@@ -97,14 +100,16 @@ export default function HomeClient() {
       if (!response.ok) {
         const errorMessage =
           (data && (data.error || data.message)) || "Upload failed";
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            content: `Upload error: ${errorMessage}`,
-          },
-        ]);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === uploadingId
+              ? {
+                  ...m,
+                  content: `❌ Upload error: ${errorMessage}`,
+                }
+              : m
+          )
+        );
 		scrollToBottom();
         return;
       }
@@ -112,31 +117,32 @@ export default function HomeClient() {
       const fileName = data?.fileName ?? file.name;
       const preview = data?.contentPreview ?? "(no preview available)";
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: [
-            `✅ **File processed successfully!**`,
-            `**File name:** ${fileName}`,
-            "",
-            `**Preview:**`,
-            "```",
-            preview,
-            "```"
-          ].join("\n"),
-        },
-      ]);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === uploadingId
+            ? {
+                ...m,
+                content: [
+                  `✅ File processed successfully!`,
+                  `File name: ${fileName}`,
+                  "",
+                  `Preview:`,
+                  "```",
+                  preview,
+                  "```",
+                ].join("\n"),
+              }
+            : m
+        )
+      );
     } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: "Unexpected error during upload. Please try again.",
-        },
-      ]);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.content === "📂 Uploading your file…"
+            ? { ...m, content: "❌ Unexpected error during upload. Please try again." }
+            : m
+        )
+      );
     } finally {
       setIsUploading(false);
       if (inputEl) inputEl.value = "";
@@ -155,17 +161,16 @@ export default function HomeClient() {
     setInput("");
     setMessages((prev) => [...prev, userMsg]);
 
-    // Placeholder assistant reply for now
+    // Chat backend not yet wired: show concise notice
     try {
       setIsSending(true);
-      const assistantMsg: Message = {
+      const notice: Message = {
         id: crypto.randomUUID(),
         role: "assistant",
         content:
-          "Thanks! This is a demo response. Soon, you'll be able to upload documents and get answers grounded in your content.",
+          "Chat is coming soon. For now, you can upload documents and see a preview.",
       };
-      await new Promise((r) => setTimeout(r, 400));
-      setMessages((prev) => [...prev, assistantMsg]);
+      setMessages((prev) => [...prev, notice]);
     } finally {
       setIsSending(false);
     }
@@ -247,13 +252,32 @@ export default function HomeClient() {
                     ) : null}
                     <div
                       className={
-                        "rounded-2xl px-3 py-2 text-sm " +
+                        "rounded-2xl px-3 py-2 text-sm break-all " +
                         (m.role === "user"
                           ? "bg-black text-white dark:bg-white dark:text-black"
                           : "bg-neutral-100 dark:bg-neutral-800")
                       }
                     >
-                      {m.content}
+                      {m.role === "assistant" && m.content.includes("```") ? (
+                        <div className="space-y-2">
+                          {m.content.split("```").map((segment, idx) =>
+                            idx % 2 === 1 ? (
+                              <pre
+                                key={idx}
+                                className="rounded-md bg-neutral-200 p-2 text-[12px] leading-relaxed dark:bg-neutral-700 whitespace-pre-wrap break-all overflow-x-hidden"
+                              >
+                                {segment}
+                              </pre>
+                            ) : (
+                              <p key={idx} className="whitespace-pre-wrap break-all">
+                                {segment}
+                              </p>
+                            )
+                          )}
+                        </div>
+                      ) : (
+                        <p className="whitespace-pre-wrap break-all">{m.content}</p>
+                      )}
                     </div>
                     {m.role === "user" ? (
                       <div className="mt-1 h-6 w-6 shrink-0 rounded-full bg-neutral-200 text-center text-[10px] leading-6 dark:bg-neutral-700">
