@@ -19,6 +19,8 @@ export default function HomeClient() {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   async function onLogout(e: React.FormEvent) {
     e.preventDefault();
@@ -52,6 +54,93 @@ export default function HomeClient() {
           "New chat started. Ask anything about your uploaded documents.",
       },
     ]);
+  }
+
+  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const inputEl = e.currentTarget;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const isValid = Array.from(files).every(
+      (file) =>
+        file.type === "text/plain" ||
+        file.type === "application/pdf" ||
+        file.type ===
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        file.name.toLowerCase().endsWith(".txt") ||
+        file.name.toLowerCase().endsWith(".pdf") ||
+        file.name.toLowerCase().endsWith(".docx")
+    );
+
+    if (!isValid) {
+      alert("Only .txt, .pdf or .docx files are allowed.");
+      if (inputEl) inputEl.value = "";
+      return;
+    }
+
+    const file = files[0];
+    try {
+      setIsUploading(true);
+	  setMessages(prev => [
+		...prev,
+		{ id: crypto.randomUUID(), role: "assistant", content: "📂 Uploading your file…" }
+	  ]);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json().catch(() => ({} as any));
+      if (!response.ok) {
+        const errorMessage =
+          (data && (data.error || data.message)) || "Upload failed";
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: `Upload error: ${errorMessage}`,
+          },
+        ]);
+		scrollToBottom();
+        return;
+      }
+
+      const fileName = data?.fileName ?? file.name;
+      const preview = data?.contentPreview ?? "(no preview available)";
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: [
+            `✅ **File processed successfully!**`,
+            `**File name:** ${fileName}`,
+            "",
+            `**Preview:**`,
+            "```",
+            preview,
+            "```"
+          ].join("\n"),
+        },
+      ]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "Unexpected error during upload. Please try again.",
+        },
+      ]);
+    } finally {
+      setIsUploading(false);
+      if (inputEl) inputEl.value = "";
+    }
   }
 
   async function onSend(e?: React.FormEvent) {
@@ -98,12 +187,18 @@ export default function HomeClient() {
             A
           </div>
           <div>
-            <p className="text-base font-semibold">AskMyDocs: AI-Powered Knowledge Explorer</p>
+            <p className="text-base font-semibold">
+              AskMyDocs: AI-Powered Knowledge Explorer
+            </p>
             <p className="muted">Ask questions about your documents</p>
           </div>
         </div>
         <form onSubmit={onLogout}>
-          <button className="button" type="submit" disabled={loggingOut}>
+          <button
+            className="button cursor-pointer"
+            type="submit"
+            disabled={loggingOut}
+          >
             {loggingOut ? "Logging out…" : "Log out"}
           </button>
         </form>
@@ -119,31 +214,51 @@ export default function HomeClient() {
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">Chat</p>
                 <div className="flex items-center gap-2">
-                  <button className="text-sm underline-offset-4 hover:underline text-cyan-500" type="button" onClick={resetChat}>New chat</button>
+                  <button
+                    className="text-sm underline-offset-4 hover:underline text-cyan-500"
+                    type="button"
+                    onClick={resetChat}
+                  >
+                    New chat
+                  </button>
                 </div>
               </div>
             </div>
 
             {/* Messages */}
-            <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto no-scrollbar pr-1">
-              {messages.map(m => (
-                <div key={m.id} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
+            <div
+              ref={listRef}
+              className="flex-1 space-y-3 overflow-y-auto no-scrollbar pr-1"
+            >
+              {messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={
+                    m.role === "user"
+                      ? "flex justify-end"
+                      : "flex justify-start"
+                  }
+                >
                   <div className="flex max-w-[85%] items-start gap-2">
-                    {m.role === 'assistant' ? (
-                      <div className="mt-1 h-6 w-6 shrink-0 rounded-full bg-neutral-200 text-center text-[10px] leading-6 dark:bg-neutral-700">🤖</div>
+                    {m.role === "assistant" ? (
+                      <div className="mt-1 h-6 w-6 shrink-0 rounded-full bg-neutral-200 text-center text-[10px] leading-6 dark:bg-neutral-700">
+                        🤖
+                      </div>
                     ) : null}
                     <div
                       className={
-                        'rounded-2xl px-3 py-2 text-sm ' +
-                        (m.role === 'user'
-                          ? 'bg-black text-white dark:bg-white dark:text-black'
-                          : 'bg-neutral-100 dark:bg-neutral-800')
+                        "rounded-2xl px-3 py-2 text-sm " +
+                        (m.role === "user"
+                          ? "bg-black text-white dark:bg-white dark:text-black"
+                          : "bg-neutral-100 dark:bg-neutral-800")
                       }
                     >
                       {m.content}
                     </div>
-                    {m.role === 'user' ? (
-                      <div className="mt-1 h-6 w-6 shrink-0 rounded-full bg-neutral-200 text-center text-[10px] leading-6 dark:bg-neutral-700">👤</div>
+                    {m.role === "user" ? (
+                      <div className="mt-1 h-6 w-6 shrink-0 rounded-full bg-neutral-200 text-center text-[10px] leading-6 dark:bg-neutral-700">
+                        👤
+                      </div>
                     ) : null}
                   </div>
                 </div>
@@ -157,13 +272,17 @@ export default function HomeClient() {
                 placeholder="Lets Start..."
                 rows={1}
                 value={input}
-                onChange={e => setInput(e.target.value)}
+                onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onKeyDown}
                 disabled={isSending}
               />
               <div className="flex items-center justify-end gap-2">
-                <button className="button w-auto" type="submit" disabled={isSending || input.trim().length === 0}>
-                  {isSending ? 'Sending…' : '➤'}
+                <button
+                  className="button w-auto"
+                  type="submit"
+                  disabled={isSending || input.trim().length === 0}
+                >
+                  {isSending ? "Sending…" : "➤"}
                 </button>
               </div>
             </form>
@@ -176,14 +295,25 @@ export default function HomeClient() {
             <h1 className="text-2xl">Welcome to Ask My Doc</h1>
             <p className="muted mt-2">
               Upload text documents like notes, articles, or books. Then chat to
-              extract insights, summarize sections, find references, or get direct
-              answers grounded in your content.
+              extract insights, summarize sections, find references, or get
+              direct answers grounded in your content.
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs dark:bg-neutral-800">Notes & Articles</span>
-              <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs dark:bg-neutral-800">Books & PDFs</span>
-              <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs dark:bg-neutral-800">Summaries</span>
-              <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs dark:bg-neutral-800">Citations (soon)</span>
+            <div className="mt-4 flex items-center gap-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt,.pdf,.docx"
+                onChange={onFileChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                className="button cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+              >
+                {isUploading ? "Uploading…" : "Upload document"}
+              </button>
             </div>
           </div>
           <div className="card">
@@ -195,7 +325,9 @@ export default function HomeClient() {
               </div>
               <div className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
                 <p className="text-sm font-medium">Summarize</p>
-                <p className="muted">Get concise section or document summaries</p>
+                <p className="muted">
+                  Get concise section or document summaries
+                </p>
               </div>
               <div className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
                 <p className="text-sm font-medium">Find references</p>

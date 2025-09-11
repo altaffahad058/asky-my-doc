@@ -8,7 +8,7 @@ export default function SignupPage() {
 	const router = useRouter();
 	const [firstName, setFirstName] = useState('');
 	const [lastName, setLastName] = useState('');
-	const [occupation, setOccupation] = useState('STUDENT');
+	const [occupation, setOccupation] = useState('');
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
 	const [confirmPassword, setConfirmPassword] = useState('');
