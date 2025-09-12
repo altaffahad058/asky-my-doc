@@ -64,9 +64,7 @@ export default function HomeClient() {
     const isValid = Array.from(files).every((file) => {
       const name = file.name.toLowerCase();
       return (
-        name.endsWith(".txt") ||
-        name.endsWith(".pdf") ||
-        name.endsWith(".docx")
+        name.endsWith(".txt") || name.endsWith(".pdf") || name.endsWith(".docx")
       );
     });
 
@@ -110,7 +108,7 @@ export default function HomeClient() {
               : m
           )
         );
-		scrollToBottom();
+        scrollToBottom();
         return;
       }
 
@@ -139,7 +137,10 @@ export default function HomeClient() {
       setMessages((prev) =>
         prev.map((m) =>
           m.content === "📂 Uploading your file…"
-            ? { ...m, content: "❌ Unexpected error during upload. Please try again." }
+            ? {
+                ...m,
+                content: "❌ Unexpected error during upload. Please try again.",
+              }
             : m
         )
       );
@@ -153,6 +154,7 @@ export default function HomeClient() {
     e?.preventDefault();
     const text = input.trim();
     if (!text) return;
+
     const userMsg: Message = {
       id: crypto.randomUUID(),
       role: "user",
@@ -161,16 +163,43 @@ export default function HomeClient() {
     setInput("");
     setMessages((prev) => [...prev, userMsg]);
 
-    // Chat backend not yet wired: show concise notice
+    // Send to backend and surface any server error messages to the chat
     try {
       setIsSending(true);
-      const notice: Message = {
+      // 🔹 Call your backend API route
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text }),
+      });
+      const data = (await res.json()) as any;
+
+      if (!res.ok) {
+        const serverError = data?.error || data?.message || `Request failed (${res.status})`;
+        const assistantErr: Message = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `❌ ${serverError}`,
+        };
+        setMessages((prev) => [...prev, assistantErr]);
+        return;
+      }
+
+      const replyText = data?.reply || "⚠️ No response from API.";
+      const assistantMsg: Message = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content:
-          "Chat is coming soon. For now, you can upload documents and see a preview.",
+        content: replyText,
       };
-      setMessages((prev) => [...prev, notice]);
+      setMessages((prev) => [...prev, assistantMsg]);
+    } catch (err: any) {
+      console.error(err);
+      const assistantErr: Message = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: `❌ ${err?.message || "Network error contacting backend."}`,
+      };
+      setMessages((prev) => [...prev, assistantErr]);
     } finally {
       setIsSending(false);
     }
@@ -269,14 +298,19 @@ export default function HomeClient() {
                                 {segment}
                               </pre>
                             ) : (
-                              <p key={idx} className="whitespace-pre-wrap break-all">
+                              <p
+                                key={idx}
+                                className="whitespace-pre-wrap break-all"
+                              >
                                 {segment}
                               </p>
                             )
                           )}
                         </div>
                       ) : (
-                        <p className="whitespace-pre-wrap break-all">{m.content}</p>
+                        <p className="whitespace-pre-wrap break-all">
+                          {m.content}
+                        </p>
                       )}
                     </div>
                     {m.role === "user" ? (
