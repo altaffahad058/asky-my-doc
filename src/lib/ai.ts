@@ -1,15 +1,3 @@
-// src/lib/ai.ts
-
-/**
- * Available Groq Models (as of 2024/2025):
- * - llama-3.1-8b-instant (fast, recommended for chat)
- * - llama-3.3-70b-versatile (larger, more capable)
- * - mixtral-8x7b-32768 (good for reasoning)
- * - gemma2-9b-it (Google's model)
- * 
- * Set GROQ_MODEL in .env to override default
- */
-
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_MODEL = process.env.GROQ_MODEL ?? "llama-3.1-8b-instant";
 const GROQ_API_BASE = process.env.GROQ_API_BASE ?? "https://api.groq.com/openai/v1";

@@ -17,13 +17,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Debug info (only in development)
-    if (process.env.NODE_ENV !== "production") {
-      console.log("AI Config:", {
-        model: aiConfig.model,
-        keyPreview: aiConfig.keyPreview
-      });
-    }
 
     // Call AI using the centralized client
     const reply = await chatRequest(message, {

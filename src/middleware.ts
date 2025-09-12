@@ -18,7 +18,6 @@ async function isAuthenticated(req: NextRequest): Promise<boolean> {
 
 export async function middleware(req: NextRequest) {
 	const { pathname } = req.nextUrl;
-	console.log('Pathname', pathname);
 
 	if (pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password') {
 		if (await isAuthenticated(req)) {
@@ -27,7 +26,6 @@ export async function middleware(req: NextRequest) {
 	}
 
 	if (pathname === '/logout') {
-		console.log('Logging out', pathname);
 		const res = NextResponse.redirect(new URL('/login', req.url));
 		res.cookies.set(AUTH_COOKIE, '', {
 			httpOnly: true,
