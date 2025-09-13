@@ -11,7 +11,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { 
           error: "AI API key not configured",
-          hint: "Please set GROQ_API_KEY in your .env file. Get a free key from console.groq.com"
+          hint: "Please set COHERE_API_KEY in your .env file. Get a free key from dashboard.cohere.com"
         },
         { status: 500 }
       );

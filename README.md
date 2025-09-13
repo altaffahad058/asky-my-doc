@@ -1,36 +1,98 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ask My Docs - AI Chat System
 
-## Getting Started
+A simple AI chat application built with Next.js and Cohere AI.
 
-First, run the development server:
+## Features
+
+- 🤖 **AI Chat**: Chat with Cohere's AI assistant
+- 🆓 **Free API**: Uses Cohere's free tier (1000 calls/month)
+- 🚀 **Simple Setup**: Just one API key needed
+
+## Quick Setup
+
+### 1. Get Cohere API Key
+- Visit: https://dashboard.cohere.com/
+- Sign up for free account
+- Go to "API Keys" section
+- Create new API key (starts with `co_`)
+
+### 2. Environment Variables
+Create `.env.local` file and add:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Database
+DATABASE_URL="file:./dev.db"
+JWT_SECRET="your-super-secret-jwt-key-here"
+
+# Cohere AI
+COHERE_API_KEY="co_your_actual_api_key_here"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. Install & Run
+```bash
+# Install dependencies
+npm install
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+# Setup database
+npm run prisma:migrate
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Start development server
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) to see the app.
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── api/chat/route.ts     # Chat API endpoint
+│   └── ...
+├── lib/
+│   └── ai.ts                 # Cohere AI integration
+└── components/
+    └── HomeClient.tsx        # Chat interface
+```
+
+## How It Works
+
+1. User types a message in the chat interface
+2. Frontend sends message to `/api/chat` endpoint
+3. Backend calls Cohere API using `chatRequest()` function
+4. AI response is returned and displayed
+
+## Available Functions
+
+```typescript
+import { chatRequest } from '@/lib/ai';
+
+// Basic chat
+const response = await chatRequest("Hello!");
+
+// With options
+const response = await chatRequest("Hello!", {
+  maxTokens: 1000,
+  temperature: 0.8,
+  systemPrompt: "You are a helpful assistant."
+});
+```
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
+- [Cohere AI Documentation](https://docs.cohere.com/)
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Prisma Documentation](https://www.prisma.io/docs)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## What's Next?
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+As you build more features, you can add:
+- Document upload and processing
+- Embeddings for semantic search
+- Chat history
+- User authentication improvements
+- File storage
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+*This is a learning project - perfect for exploring AI chat integration!* 🎉
