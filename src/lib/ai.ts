@@ -1,7 +1,7 @@
 // Cohere Configuration (for chat and embeddings)
 const COHERE_API_KEY = process.env.COHERE_API_KEY;
 const COHERE_API_BASE = process.env.COHERE_API_BASE ?? "https://api.cohere.ai/v1";
-const COHERE_CHAT_MODEL = process.env.COHERE_CHAT_MODEL ?? "command-r";
+const COHERE_CHAT_MODEL = process.env.COHERE_CHAT_MODEL ?? "command-a-03-2025";
 const COHERE_EMBED_MODEL = process.env.COHERE_EMBED_MODEL ?? "embed-english-v3.0";
 
 if (!COHERE_API_KEY) {
