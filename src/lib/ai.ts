@@ -1,7 +1,8 @@
-// Cohere Configuration (for chat)
+// Cohere Configuration (for chat and embeddings)
 const COHERE_API_KEY = process.env.COHERE_API_KEY;
 const COHERE_API_BASE = process.env.COHERE_API_BASE ?? "https://api.cohere.ai/v1";
 const COHERE_CHAT_MODEL = process.env.COHERE_CHAT_MODEL ?? "command-r";
+const COHERE_EMBED_MODEL = process.env.COHERE_EMBED_MODEL ?? "embed-english-v3.0";
 
 if (!COHERE_API_KEY) {
   throw new Error("⚠️ Missing COHERE_API_KEY in .env file. Get a free key from dashboard.cohere.com");
@@ -60,7 +61,11 @@ export async function chatRequest(
 // Export configuration for debugging
 export const aiConfig = {
   chatModel: COHERE_CHAT_MODEL,
+  embedModel: COHERE_EMBED_MODEL,
   apiBase: COHERE_API_BASE,
   hasApiKey: Boolean(COHERE_API_KEY),
   keyPreview: COHERE_API_KEY ? `${COHERE_API_KEY.substring(0, 8)}...` : "NOT_SET"
 };
+
+// Export shared constants for use in other modules
+export { COHERE_API_KEY, COHERE_API_BASE, COHERE_EMBED_MODEL };

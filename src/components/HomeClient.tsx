@@ -114,6 +114,7 @@ export default function HomeClient() {
 
       const fileName = data?.fileName ?? file.name;
       const preview = data?.contentPreview ?? "(no preview available)";
+      const chunksCreated = data?.chunksCreated ?? 0;
 
       setMessages((prev) =>
         prev.map((m) =>
@@ -122,7 +123,8 @@ export default function HomeClient() {
                 ...m,
                 content: [
                   `✅ File processed successfully!`,
-                  `File name: ${fileName}`,
+                  `📄 File: ${fileName}`,
+                  `🧩 Text chunks created: ${chunksCreated}`,
                   "",
                   `Preview:`,
                   "```",
@@ -186,10 +188,18 @@ export default function HomeClient() {
       }
 
       const replyText = data?.reply || "⚠️ No response from API.";
+      const contextUsed = data?.contextUsed || false;
+      const sourcesCount = data?.sourcesCount || 0;
+      
+      // Add context indicator if document context was used
+      const contextIndicator = contextUsed 
+        ? `\n\n📚 *Answer based on ${sourcesCount} relevant section${sourcesCount > 1 ? 's' : ''} from your documents*`
+        : "";
+
       const assistantMsg: Message = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: replyText,
+        content: replyText + contextIndicator,
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (err: any) {

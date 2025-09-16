@@ -47,9 +47,10 @@ model Document {
 model Chunk {
   id         Int      @id @default(autoincrement())
   text       String
-  embedding  Json   // stored as pgvector
+  // embeddings now stored in Pinecone, referenced by chunk.id
   document   Document @relation(fields: [documentId], references: [id])
   documentId Int
+  createdAt  DateTime @default(now())
 }
 
 
