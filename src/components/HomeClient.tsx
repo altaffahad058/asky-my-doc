@@ -401,10 +401,6 @@ export default function HomeClient() {
                 <p className="text-sm font-medium">Find references</p>
                 <p className="muted">Citations to the most relevant passages</p>
               </div>
-              <div className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
-                <p className="text-sm font-medium">Organize</p>
-                <p className="muted">Workspaces and sharing (coming later)</p>
-              </div>
             </div>
           </div>
         </div>
