@@ -5,10 +5,10 @@ AskMyDocs is an end-to-end AI assistant for your personal knowledge base. Users 
 ## Highlights
 
 - 🔐 **Full-stack auth** – email/password signup, login, logout, password reset, and signed session cookies (`src/app/api/auth/*`, `src/lib/auth.ts`).
-- 📂 **Document ingestion pipeline** – server-side parsing (PDF, DOCX, TXT), chunking, Prisma persistence, Cohere embeddings, Pinecone vector storage (`src/app/api/upload/route.ts`, `src/lib/chunking.ts`, `src/lib/embeddings.ts`, `src/lib/pinecone.ts`).
-- 💬 **Contextual chat** – every chat call retrieves the most relevant chunks via vector search before hitting Cohere (`src/app/api/chat/route.ts`, `src/lib/ai.ts`).
-- 🔎 **Semantic search API** – dedicated `/api/search` endpoint to inspect the top matching passages per query.
-- 🧱 **Typed data layer** – Prisma schema for `User`, `Document`, and `Chunk`, with migrations under `prisma/migrations`.
+- 📂 **Document ingestion pipeline** – server-side parsing (PDF, DOCX, TXT), LangChain chunking, Prisma persistence, Cohere embeddings, Pinecone vector storage (`src/app/api/upload/route.ts`, `src/lib/embeddings.ts`, `src/lib/pinecone.ts`).
+- 💬 **Contextual chat workspace** – the chat route performs scoped Pinecone searches before calling Cohere; the UI enforces document selection and surfaces context usage (`src/app/api/chat/route.ts`, `src/hooks/useChat.ts`, `src/components/home/ChatPane.tsx`).
+- 🗂️ **Document dashboard** – `/api/documents` returns user uploads with chunk counts, powering the sidebar picker and upload refresh (`src/app/api/documents/route.ts`, `src/hooks/useDocuments.ts`, `src/components/home/DocumentList.tsx`).
+- 🧱 **Typed data layer** – Prisma schema for `User` (first/last/occupation fields), `Document`, and `Chunk`, with migrations under `prisma/migrations`.
 - 💅 **Modern UI** – Next.js App Router, React 19, Tailwind CSS 4, and a single-page chat/workspace experience in `src/components/HomeClient.tsx`.
 
 ## Tech Stack
@@ -18,6 +18,7 @@ AskMyDocs is an end-to-end AI assistant for your personal knowledge base. Users 
 - **Database**: PostgreSQL + Prisma ORM
 - **Vector Store**: Pinecone (cosine similarity, 1,024 dimensions)
 - **AI**: Cohere (Command R for chat, Embed v3 for embeddings)
+- **Retrieval tooling**: LangChain text splitters + Pinecone store helpers
 - **Auth**: Signed JWT cookie sessions (`AUTH_SECRET`)
 - **File processing**: `pdf-parse`, `mammoth`, Node streams
 
@@ -26,25 +27,26 @@ AskMyDocs is an end-to-end AI assistant for your personal knowledge base. Users 
 ```
 Browser (HomeClient)
    ├─ Auth pages: (auth)/login, signup, forgot-password
+   ├─ Document list sidebar ← /api/documents (JSON)
    ├─ Upload form → /api/upload (multipart/form-data)
-   └─ Chat composer → /api/chat (JSON)
+   └─ Chat composer (requires selected document) → /api/chat (JSON)
 
 /api/upload
    1. Verify session via getSessionUserId()
-   2. Parse file, extract text, chunk (`chunkText`)
-   3. Persist Document + Chunks in PostgreSQL (Prisma)
-   4. Generate embeddings (Cohere) + upsert into Pinecone
+   2. Parse file, extract text, chunk with RecursiveCharacterTextSplitter
+   3. Persist Document + Chunks in PostgreSQL (Prisma transaction)
+   4. Generate embeddings (Cohere) + upsert into Pinecone namespace user-{id}
 
 /api/chat
    1. Verify session
-   2. Embed user query
-   3. Top-K similarity search from Pinecone (user scoped)
-   4. Pull chunk metadata from PostgreSQL
+   2. Validate payload & optional document filter
+   3. Embed user query with Cohere
+   4. Top-K similarity search (PineconeStore) scoped to the user/optional document
    5. Assemble contextual system prompt
-   6. Call Cohere Chat → return grounded answer
+   6. Call Cohere Chat → return grounded answer + context metadata
 
-/api/search
-   - Same retrieval pipeline as chat, but returns structured matches for UI debugging/inspection.
+/api/documents
+   - Returns the user’s uploads with chunk counts for UI selection/state.
 ```
 
 ## Getting Started
@@ -55,6 +57,8 @@ Browser (HomeClient)
 - PostgreSQL database
 - Pinecone account + index (dim: 1024, metric: cosine)
 - Cohere API key
+
+> **Note**: `src/lib/ai.ts` throws during import if `COHERE_API_KEY` is missing, so the server will fail to boot until it is set.
 
 ### 2. Install dependencies
 
@@ -111,24 +115,20 @@ Visit `http://localhost:3000` to sign up, upload documents, and start chatting.
 
 ## Document Ingestion Details
 
-- **Uploads**: handled by `/api/upload` (Node runtime). Files >5 MB or unsupported types are rejected.
-- **Parsing**: `pdf-parse` for PDF, `mammoth` for DOCX, UTF-8 decoding for TXT.
-- **Chunking**: default 1,000 characters with 200-character overlap (see `chunkText`).
-- **Storage**: raw document text + chunks live in PostgreSQL; embeddings live only in Pinecone keyed by `chunk_{id}`.
-- **Resilience**: if embedding generation fails, the API returns a warning but still keeps the document/chunks so you can retry later.
+- **Uploads**: handled by `/api/upload` (Node runtime). Files larger than 5 MB or unsupported types (`.txt`, `.pdf`, `.docx`) are rejected before parsing begins.
+- **Parsing**: `pdf-parse` for PDF, `mammoth` for DOCX, UTF-8 decoding for TXT. Failures surface descriptive hints (`error` + `hint` fields) in the JSON response.
+- **Chunking**: LangChain `RecursiveCharacterTextSplitter` (1,000 chars, 200 overlap) trims each chunk and drops anything under 100 characters to keep embeddings high-signal.
+- **Storage**: Documents + plain-text chunks live in PostgreSQL; embeddings live only in Pinecone under namespace `user-{userId}`, referencing `chunkId`.
+- **Resilience**: if embedding generation fails, the API warns the caller but keeps the document/chunks so you can retry vectorization later.
 
-## Chat + Search Flow
+## Chat Retrieval Flow
 
-1. `HomeClient` posts `{ message }` to `/api/chat`.
-2. Route ensures the user session exists (cookie JWT).
-3. `generateQueryEmbedding()` calls Cohere Embed with `input_type: search_query`.
-4. `searchSimilar()` queries Pinecone filtered by `userId`.
-5. Matching `chunkId`s are hydrated from PostgreSQL (with related document metadata).
-6. The system prompt is rebuilt to include the best chunks and guardrails (fallbacks if no context is found).
-7. `chatRequest()` calls Cohere Chat with the custom system prompt.
-8. Response is streamed back to the UI and annotated (“📚 Answer based on N sections…”).
-
-The `/api/search` route exposes the same retrieval mechanics without asking Cohere, which is useful for debugging embeddings and surfacing raw text matches in future UI components.
+1. `useChat` enforces document selection and posts `{ message, documentId }` to `/api/chat`.
+2. Route ensures the user session exists (cookie JWT) and validates the payload.
+3. `CohereEmbeddings` generates the query vector; `PineconeStore.fromExistingIndex` searches namespace `user-{id}` (optionally filtered to the provided `documentId`).
+4. Up to 3 top chunks (with file metadata + scores) are stitched into a contextual system prompt; missing context yields a fallback helper prompt.
+5. `chatRequest()` calls Cohere Chat with the prompt and returns `{ reply, contextUsed, sourcesCount }`.
+6. The UI appends 📚 / ℹ️ badges that explain whether document context powered the answer.
 
 ## API Surface
 
@@ -138,9 +138,9 @@ The `/api/search` route exposes the same retrieval mechanics without asking Cohe
 | `/api/auth/login` | POST | Email/password login and session creation. |
 | `/api/auth/logout` | POST | Clears session cookie. |
 | `/api/auth/forgot-password` | POST | Two-step reset (email existence check, then password update). |
+| `/api/documents` | GET | List the user’s uploaded documents + chunk totals. |
 | `/api/upload` | POST (multipart) | Parse, chunk, embed, and persist a document. |
-| `/api/chat` | POST | Contextual chat grounded in user documents. |
-| `/api/search` | POST | Retrieve top matching chunks for a query. |
+| `/api/chat` | POST | Contextual chat grounded in the selected document. |
 
 All routes require `getSessionUserId()` unless noted otherwise.
 
