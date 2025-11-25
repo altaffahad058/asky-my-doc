@@ -13,11 +13,16 @@
     "prisma:reset": "prisma migrate reset"
   },
   "dependencies": {
-    "@pinecone-database/pinecone": "^6.1.2",
+    "@langchain/cohere": "^1.0.1",
+    "@langchain/core": "^1.1.0",
+    "@langchain/pinecone": "^1.0.1",
+    "@langchain/textsplitters": "^1.0.1",
+    "@pinecone-database/pinecone": "^5.1.2",
     "@prisma/client": "^6.16.0",
     "bcryptjs": "^3.0.2",
     "formidable": "^3.5.4",
     "jose": "^6.1.0",
+    "langchain": "^1.1.1",
     "mammoth": "^1.10.0",
     "next": "15.5.2",
     "pdf-parse": "^1.1.1",

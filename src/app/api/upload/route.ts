@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { getSessionUserId } from "@/lib/auth";
 import { prisma } from '@/lib/db';
-import { chunkText } from '@/lib/chunking';
-import { generateEmbeddings, embeddingConfig } from '@/lib/embeddings';
-import { storeEmbeddings, pineconeConfig } from '@/lib/pinecone';
+import { embeddingConfig } from '@/lib/embeddings';
+import { pineconeConfig, getPineconeIndex } from '@/lib/pinecone';
+import { Document as LangChainDocument } from "@langchain/core/documents";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import { CohereEmbeddings } from "@langchain/cohere";
+import { PineconeStore } from "@langchain/pinecone";
 
 export const runtime = "nodejs";
 
@@ -35,6 +38,7 @@ export async function POST(req: Request) {
   }
 
   try {
+    // Lazy load file parsers to keep the edge bundle slim
     const { default: pdf } = await import("pdf-parse");
     const { default: mammoth } = await import("mammoth");
     const formData = await req.formData();
@@ -91,7 +95,42 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Create document and chunks in a transaction
+    // Build LangChain documents + chunking
+    const baseDocument = new LangChainDocument({
+      pageContent: textContent,
+      metadata: {
+        fileName: safeName,
+        fileType: extension,
+        userId,
+      },
+    });
+
+    // Use LangChain splitter so chunk sizing stays consistent with retrieval tooling
+    const textSplitter = new RecursiveCharacterTextSplitter({
+      chunkSize: 1000,
+      chunkOverlap: 200,
+    });
+
+    const chunkDocuments = (await textSplitter.splitDocuments([baseDocument]))
+      .map((doc: LangChainDocument) => new LangChainDocument({
+        pageContent: doc.pageContent.trim(),
+        metadata: {
+          ...doc.metadata,
+          userId,
+          fileName: safeName,
+          fileType: extension,
+        },
+      }))
+      .filter((doc: LangChainDocument) => doc.pageContent.length >= 100);
+
+    if (chunkDocuments.length === 0) {
+      return NextResponse.json({
+        error: "Unable to generate meaningful chunks from this document",
+        hint: "Try uploading a document with denser text or adjust chunk settings.",
+      }, { status: 400 });
+    }
+
+    // Create document + associated chunks atomically so we never have orphan records
     const result = await prisma.$transaction(async (tx) => {
       // Create the document
       const document = await tx.document.create({
@@ -105,24 +144,15 @@ export async function POST(req: Request) {
       });
 
       // Generate chunks
-      const chunks = chunkText(textContent, {
-        chunkSize: 1000,
-        overlap: 200,
-        minChunkSize: 100
-      });
-
-      // Create chunks in database (no embedding field needed now)
       const createdChunks = [];
-      if (chunks.length > 0) {
-        for (const chunk of chunks) {
-          const createdChunk = await tx.chunk.create({
-            data: {
-              text: chunk.text,
-              documentId: document.id
-            }
-          });
-          createdChunks.push(createdChunk);
-        }
+      for (const chunkDoc of chunkDocuments) {
+        const createdChunk = await tx.chunk.create({
+          data: {
+            text: chunkDoc.pageContent,
+            documentId: document.id
+          }
+        });
+        createdChunks.push(createdChunk);
       }
 
       return { document, chunks: createdChunks };
@@ -131,27 +161,34 @@ export async function POST(req: Request) {
     // Generate embeddings and store in Pinecone
     try {
       if (result.chunks.length > 0) {
-        console.log(`Generating embeddings for ${result.chunks.length} chunks...`);
-        
-        const chunkTexts = result.chunks.map(chunk => chunk.text);
-        const embeddings = await generateEmbeddings(chunkTexts);
-        
-        // Prepare embeddings for Pinecone
-        const embeddingsToStore = embeddings.map((embedding, index) => ({
-          chunkId: result.chunks[index].id,
-          embedding: embedding.embedding,
+        console.log(`Generating embeddings for ${result.chunks.length} chunks via LangChain...`);
+
+        const embeddingsClient = new CohereEmbeddings({
+          apiKey: process.env.COHERE_API_KEY!,
+          model: process.env.COHERE_EMBED_MODEL ?? "embed-english-v3.0",
+        });
+
+        const pineconeIndex = getPineconeIndex();
+        const docsForIndex = result.chunks.map((chunk, index) => new LangChainDocument({
+          pageContent: chunk.text,
           metadata: {
-            chunkId: result.chunks[index].id,
+            ...(chunkDocuments[index]?.metadata ?? {}),
+            chunkId: chunk.id,
             documentId: result.document.id,
             userId,
-            text: embedding.text,
-            chunkLength: embedding.text.length,
-          }
+            fileName: safeName,
+            chunkIndex: index,
+            chunkLength: chunk.text.length,
+            text: chunk.text.slice(0, 1000),
+          },
         }));
-        
-        // Store in Pinecone
-        await storeEmbeddings(embeddingsToStore);
-        console.log(`Stored ${embeddings.length} embeddings in Pinecone`);
+
+        // Let LangChain handle batching + upserts so we stay in sync with retrieval metadata
+        await PineconeStore.fromDocuments(docsForIndex, embeddingsClient, {
+          pineconeIndex,
+          namespace: `user-${userId}`,
+        });
+        console.log(`Stored ${result.chunks.length} embeddings in Pinecone`);
       }
     } catch (embeddingError) {
       console.error('Error generating/storing embeddings:', embeddingError);

@@ -2,9 +2,10 @@
 import { NextResponse } from "next/server";
 import { getSessionUserId } from "@/lib/auth";
 import { chatRequest, aiConfig } from "@/lib/ai";
-import { generateQueryEmbedding } from "@/lib/embeddings";
-import { searchSimilar } from "@/lib/pinecone";
-import { prisma } from "@/lib/db";
+import { embeddingConfig } from "@/lib/embeddings";
+import { getPineconeIndex, pineconeConfig } from "@/lib/pinecone";
+import { CohereEmbeddings } from "@langchain/cohere";
+import { PineconeStore } from "@langchain/pinecone";
 
 export async function POST(req: Request) {
   const userId = await getSessionUserId();
@@ -26,12 +27,32 @@ export async function POST(req: Request) {
       );
     }
 
-    // Check if AI is configured
+    // Check if AI + vector services are configured
     if (!aiConfig.hasApiKey) {
       return NextResponse.json(
         {
           error: "AI API key not configured",
           hint: "Please set COHERE_API_KEY in your .env file. Get a free key from dashboard.cohere.com",
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!embeddingConfig.hasApiKey) {
+      return NextResponse.json(
+        {
+          error: "Embedding service not configured",
+          hint: "Please set COHERE_API_KEY in your .env file. Get a free key from dashboard.cohere.com",
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!pineconeConfig.hasApiKey) {
+      return NextResponse.json(
+        {
+          error: "Pinecone not configured",
+          hint: "Please set PINECONE_API_KEY in your .env file. Get a free key from app.pinecone.io",
         },
         { status: 500 }
       );
@@ -44,36 +65,37 @@ export async function POST(req: Request) {
 
     try {
       console.log(`Searching for context: "${message}"`);
+      const trimmedMessage = message.trim();
 
-      // Generate embedding for the user's message
-      const queryEmbedding = await generateQueryEmbedding(message.trim());
-
-      // Search for relevant chunks (top 3 for context)
-      const searchResults = await searchSimilar(queryEmbedding, {
-        topK: 3,
-        userId,
+      const embeddingsClient = new CohereEmbeddings({
+        apiKey: process.env.COHERE_API_KEY!,
+        model: process.env.COHERE_EMBED_MODEL ?? "embed-english-v3.0",
       });
 
-      if (searchResults.length > 0) {
-        // Fetch full chunk details
-        const chunkIds = searchResults.map((result) => result.chunkId);
-        const chunks = await prisma.chunk.findMany({
-          where: {
-            id: { in: chunkIds },
-            document: { userId },
-          },
-          include: {
-            document: {
-              select: { title: true, fileName: true },
-            },
-          },
-        });
+      const pineconeIndex = getPineconeIndex();
+      const vectorStore = await PineconeStore.fromExistingIndex(
+        embeddingsClient,
+        {
+          pineconeIndex,
+          namespace: `user-${userId}`,
+        }
+      );
 
+      // Search for relevant chunks (top 3 for context)
+      const searchResults = await vectorStore.similaritySearchWithScore(
+        trimmedMessage,
+        3
+      );
+
+      if (searchResults.length > 0) {
         // Build context from relevant chunks
-        contextChunks = chunks.map((chunk) => ({
-          text: chunk.text,
-          document: chunk.document.title,
-          score: searchResults.find((r) => r.chunkId === chunk.id)?.score || 0,
+        contextChunks = searchResults.map(([doc, score]) => ({
+          text: doc.pageContent,
+          document:
+            (doc.metadata?.fileName as string) ??
+            (doc.metadata?.title as string) ??
+            "Document",
+          score,
         }));
 
         // Create enhanced system prompt with context
@@ -92,9 +114,7 @@ Instructions:
 - If the context doesn't contain relevant information, say "I don't find relevant information in your uploaded documents to answer this question."
 - When referencing information, you can mention which document it came from`;
 
-        console.log(
-          `Found ${contextChunks.length} relevant chunks for context`
-        );
+        console.log(`Found ${contextChunks.length} relevant chunks for context`);
       } else {
         console.log("No relevant document context found");
         systemPrompt =

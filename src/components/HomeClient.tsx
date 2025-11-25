@@ -367,6 +367,11 @@ export default function HomeClient() {
               direct answers grounded in your content.
             </p>
             <div className="mt-4 flex items-center gap-3">
+              {/* 
+                File upload input is hidden. Ref is used to programmatically trigger click when user presses the button.
+                Only files of type .txt, .pdf, or .docx are accepted.
+                When a file is selected, onFileChange handles the upload logic.
+              */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -374,6 +379,11 @@ export default function HomeClient() {
                 onChange={onFileChange}
                 className="hidden"
               />
+              {/* 
+                Upload button opens the file picker via ref.
+                Disabled and shows "Uploading…" if an upload is in progress.
+                Otherwise, shows "Upload document". 
+              */}
               <button
                 type="button"
                 className="button cursor-pointer"
