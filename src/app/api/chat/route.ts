@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { message } = await req.json();
+    const { message, documentId } = await req.json();
 
     if (
       !message ||
@@ -58,13 +58,27 @@ export async function POST(req: Request) {
       );
     }
 
+    const normalizedDocumentId =
+      typeof documentId === "number"
+        ? documentId
+        : typeof documentId === "string" && documentId.trim().length > 0
+        ? Number(documentId)
+        : undefined;
+    const hasDocumentFilter =
+      typeof normalizedDocumentId === "number" &&
+      !Number.isNaN(normalizedDocumentId);
+
     // Search for relevant document chunks
     let contextChunks = [];
     let systemPrompt =
       "You are a helpful AI assistant. Be concise and helpful.";
 
     try {
-      console.log(`Searching for context: "${message}"`);
+      console.log(
+        `Searching for context: "${message}"${
+          hasDocumentFilter ? ` within document ${normalizedDocumentId}` : ""
+        }`
+      );
       const trimmedMessage = message.trim();
 
       const embeddingsClient = new CohereEmbeddings({
@@ -81,10 +95,15 @@ export async function POST(req: Request) {
         }
       );
 
+      const pineconeFilter = hasDocumentFilter
+        ? { documentId: normalizedDocumentId }
+        : undefined;
+
       // Search for relevant chunks (top 3 for context)
       const searchResults = await vectorStore.similaritySearchWithScore(
         trimmedMessage,
-        3
+        3,
+        pineconeFilter
       );
 
       if (searchResults.length > 0) {

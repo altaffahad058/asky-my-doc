@@ -1,9 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Message = { id: string; role: "user" | "assistant"; content: string };
+type DocumentSummary = {
+  id: number;
+  title: string;
+  fileName: string;
+  fileType: string;
+  createdAt: string;
+  chunkCount: number;
+};
 
 export default function HomeClient() {
   const router = useRouter();
@@ -21,6 +29,39 @@ export default function HomeClient() {
   const listRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [documents, setDocuments] = useState<DocumentSummary[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(true);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string>("");
+
+  const loadDocuments = useCallback(async () => {
+    try {
+      setDocumentsLoading(true);
+      const res = await fetch("/api/documents");
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to load documents");
+      }
+      setDocuments(Array.isArray(data?.documents) ? data.documents : []);
+    } catch (error) {
+      console.error("Failed to load documents", error);
+    } finally {
+      setDocumentsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
+
+  useEffect(() => {
+    if (documents.length === 0) {
+      setSelectedDocumentId("");
+      return;
+    }
+    if (!documents.some((doc) => String(doc.id) === selectedDocumentId)) {
+      setSelectedDocumentId(String(documents[0].id));
+    }
+  }, [documents, selectedDocumentId]);
 
   async function onLogout(e: React.FormEvent) {
     e.preventDefault();
@@ -55,6 +96,10 @@ export default function HomeClient() {
       },
     ]);
   }
+
+  const canCompose = selectedDocumentId.trim().length > 0;
+  const canSend =
+    canCompose && !isSending && input.trim().length > 0;
 
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const inputEl = e.currentTarget;
@@ -116,6 +161,7 @@ export default function HomeClient() {
       const preview = data?.contentPreview ?? "(no preview available)";
       const chunksCreated = data?.chunksCreated ?? 0;
 
+      await loadDocuments();
       setMessages((prev) =>
         prev.map((m) =>
           m.id === uploadingId
@@ -135,6 +181,9 @@ export default function HomeClient() {
             : m
         )
       );
+      if (data?.documentId) {
+        setSelectedDocumentId(String(data.documentId));
+      }
     } catch (err) {
       setMessages((prev) =>
         prev.map((m) =>
@@ -156,6 +205,20 @@ export default function HomeClient() {
     e?.preventDefault();
     const text = input.trim();
     if (!text) return;
+    const documentIdPayload =
+      selectedDocumentId.trim().length > 0
+        ? Number(selectedDocumentId)
+        : undefined;
+    if (documentIdPayload == null || Number.isNaN(documentIdPayload)) {
+      const assistantErr: Message = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content:
+          "ℹ️ Please select a document from the sidebar before asking a question.",
+      };
+      setMessages((prev) => [...prev, assistantErr]);
+      return;
+    }
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -172,7 +235,10 @@ export default function HomeClient() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({
+          message: text,
+          documentId: documentIdPayload,
+        }),
       });
       const data = (await res.json()) as any;
 
@@ -192,9 +258,23 @@ export default function HomeClient() {
       const sourcesCount = data?.sourcesCount || 0;
       
       // Add context indicator if document context was used
-      const contextIndicator = contextUsed 
-        ? `\n\n📚 *Answer based on ${sourcesCount} relevant section${sourcesCount > 1 ? 's' : ''} from your documents*`
-        : "";
+      const selectedDocument = documents.find(
+        (doc) => doc.id === documentIdPayload
+      );
+      const docLabel = selectedDocument
+        ? selectedDocument.title || selectedDocument.fileName
+        : null;
+      const contextIndicator = contextUsed
+        ? `\n\n📚 *Answer based on ${sourcesCount} relevant section${
+            sourcesCount > 1 ? "s" : ""
+          }${
+            docLabel
+              ? ` from "${docLabel}"`
+              : documentIdPayload != null
+              ? " from the selected document"
+              : " from your documents"
+          }*`
+        : `\n\nℹ️ *No relevant context found in the selected document.*`;
 
       const assistantMsg: Message = {
         id: crypto.randomUUID(),
@@ -257,15 +337,13 @@ export default function HomeClient() {
             <div className="sticky top-0 z-10 -mx-6 -mt-6 mb-3 border-b border-neutral-200 bg-white px-6 py-4 dark:border-neutral-800 dark:bg-neutral-900">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">Chat</p>
-                <div className="flex items-center gap-2">
-                  <button
-                    className="text-sm underline-offset-4 hover:underline text-cyan-500"
-                    type="button"
-                    onClick={resetChat}
-                  >
-                    New chat
-                  </button>
-                </div>
+                <button
+                  className="text-sm underline-offset-4 hover:underline text-cyan-500"
+                  type="button"
+                  onClick={resetChat}
+                >
+                  New chat
+                </button>
               </div>
             </div>
 
@@ -342,13 +420,13 @@ export default function HomeClient() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onKeyDown}
-                disabled={isSending}
+                disabled={isSending || !canCompose}
               />
               <div className="flex items-center justify-end gap-2">
                 <button
                   className="button w-auto"
                   type="submit"
-                  disabled={isSending || input.trim().length === 0}
+                  disabled={!canSend}
                 >
                   {isSending ? "Sending…" : "➤"}
                 </button>
@@ -395,23 +473,50 @@ export default function HomeClient() {
             </div>
           </div>
           <div className="card">
-            <h2 className="text-lg font-semibold">What you can do</h2>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <div className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
-                <p className="text-sm font-medium">Ask questions</p>
-                <p className="muted">Query across one or many documents</p>
-              </div>
-              <div className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
-                <p className="text-sm font-medium">Summarize</p>
-                <p className="muted">
-                  Get concise section or document summaries
-                </p>
-              </div>
-              <div className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
-                <p className="text-sm font-medium">Find references</p>
-                <p className="muted">Citations to the most relevant passages</p>
-              </div>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Your documents</h2>
+              <button
+                type="button"
+                className="text-sm underline-offset-4 hover:underline text-cyan-500"
+                onClick={loadDocuments}
+                disabled={documentsLoading}
+              >
+                {documentsLoading ? "Refreshing…" : "Refresh"}
+              </button>
             </div>
+            {documentsLoading ? (
+              <p className="muted mt-3">Loading documents…</p>
+            ) : documents.length === 0 ? (
+              <p className="muted mt-3">
+                No documents uploaded yet. Upload one to start chatting.
+              </p>
+            ) : (
+              <div className="mt-4 space-y-2">
+                {documents.map((doc) => {
+                  const isActive = selectedDocumentId === String(doc.id);
+                  return (
+                    <button
+                      key={doc.id}
+                      type="button"
+                      className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition ${
+                        isActive
+                          ? "border-black bg-neutral-100 dark:border-white dark:bg-neutral-800"
+                          : "border-neutral-200 hover:border-black dark:border-neutral-800 dark:hover:border-white"
+                      }`}
+                      onClick={() => setSelectedDocumentId(String(doc.id))}
+                    >
+                      <p className="font-medium truncate">
+                        {doc.title || doc.fileName}
+                      </p>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                        {doc.fileType.toUpperCase()} · {doc.chunkCount} chunk
+                        {doc.chunkCount === 1 ? "" : "s"}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </section>
