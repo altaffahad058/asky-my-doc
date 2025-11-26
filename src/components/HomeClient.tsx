@@ -1,9 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useDocuments } from "@/hooks/useDocuments";
 import { useChat } from "@/hooks/useChat";
+import { useAuth } from "@/hooks/useAuth";
 import { HomeHeader } from "./home/HomeHeader";
 import { DocumentList } from "./home/DocumentList";
 import { ChatPane } from "./home/ChatPane";
@@ -14,8 +14,7 @@ type HomeClientProps = {
 };
 
 export default function HomeClient({ userFullName }: HomeClientProps) {
-  const router = useRouter();
-  const [loggingOut, setLoggingOut] = useState(false);
+  const { logout, isLoggingOut } = useAuth();
   const listRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const {
@@ -45,13 +44,7 @@ export default function HomeClient({ userFullName }: HomeClientProps) {
 
   async function onLogout(e: React.FormEvent) {
     e.preventDefault();
-    try {
-      setLoggingOut(true);
-      await fetch("/api/auth/logout", { method: "POST" });
-      router.replace("/login");
-    } finally {
-      setLoggingOut(false);
-    }
+    await logout();
   }
 
   function scrollToBottom() {
@@ -144,46 +137,48 @@ export default function HomeClient({ userFullName }: HomeClientProps) {
   }
 
   return (
-    <div className="flex w-full flex-col gap-8">
-      <HomeHeader loggingOut={loggingOut} onLogout={onLogout} />
+    <div className="flex w-full justify-center">
+      <div className="flex w-full max-w-6xl flex-col gap-8">
+        <HomeHeader loggingOut={isLoggingOut} onLogout={onLogout} />
 
-      {/* Main Content */}
-      <section className="grid w-full gap-6 md:grid-cols-12">
-        {/* Chat (8 cols) */}
-        <ChatPane
-          messages={messages}
-          listRef={listRef}
-          input={input}
-          onInputChange={setInput}
-          isSending={isSending}
-          canCompose={canCompose}
-          canSend={canSend}
-          onSend={onSend}
-          onKeyDown={onKeyDown}
-          onResetChat={resetChat}
-          onFetchReferences={fetchReferences}
-          canFetchReferences={canCompose && !isFetchingReferences}
-          isFetchingReferences={isFetchingReferences}
-        />
+        {/* Main Content */}
+        <section className="grid w-full gap-6 md:grid-cols-12">
+          {/* Chat (8 cols) */}
+          <ChatPane
+            messages={messages}
+            listRef={listRef}
+            input={input}
+            onInputChange={setInput}
+            isSending={isSending}
+            canCompose={canCompose}
+            canSend={canSend}
+            onSend={onSend}
+            onKeyDown={onKeyDown}
+            onResetChat={resetChat}
+            onFetchReferences={fetchReferences}
+            canFetchReferences={canCompose && !isFetchingReferences}
+            isFetchingReferences={isFetchingReferences}
+          />
 
-        {/* Sidebar (4 cols) */}
-        <div className="md:col-span-4 order-2 md:order-none flex flex-col gap-6">
-          <UploadCard
-            fileInputRef={fileInputRef}
-            isUploading={isUploading}
-            onFileChange={onFileChange}
-            userFullName={userFullName}
-          />
-          <DocumentList
-            documents={documents}
-            selectedDocumentId={selectedDocumentId}
-            onSelect={setSelectedDocumentId}
-            loading={documentsLoading}
-            onRefresh={loadDocuments}
-            onDelete={handleDeleteDocument}
-          />
-        </div>
-      </section>
+          {/* Sidebar (4 cols) */}
+          <div className="md:col-span-4 order-2 md:order-none flex flex-col gap-6">
+            <UploadCard
+              fileInputRef={fileInputRef}
+              isUploading={isUploading}
+              onFileChange={onFileChange}
+              userFullName={userFullName}
+            />
+            <DocumentList
+              documents={documents}
+              selectedDocumentId={selectedDocumentId}
+              onSelect={setSelectedDocumentId}
+              loading={documentsLoading}
+              onRefresh={loadDocuments}
+              onDelete={handleDeleteDocument}
+            />
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

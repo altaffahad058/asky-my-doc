@@ -19,7 +19,7 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen p-6 md:py-10">
-      <div className="min-w-[1400px]">
+      <div className="w-full">
         <HomeClient userFullName={userFullName} />
       </div>
     </main>
