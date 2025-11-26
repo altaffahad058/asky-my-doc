@@ -124,8 +124,8 @@ export default function HomeClient({ userFullName }: HomeClientProps) {
   }
 
   return (
-    <div className="flex w-full justify-center">
-      <div className="flex w-full max-w-6xl flex-col gap-8">
+    <div className="flex justify-center">
+      <div className="flex flex-col gap-8">
         <HomeHeader loggingOut={loggingOut} onLogout={onLogout} />
 
         {/* Main Content */}
