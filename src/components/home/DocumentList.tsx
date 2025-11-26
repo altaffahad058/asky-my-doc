@@ -1,4 +1,5 @@
 import { DocumentSummary } from "@/types/documents";
+import { Trash2 } from "lucide-react";
 
 type DocumentListProps = {
   documents: DocumentSummary[];
@@ -6,6 +7,7 @@ type DocumentListProps = {
   onSelect: (documentId: string) => void;
   loading: boolean;
   onRefresh: () => void;
+  onDelete?: (documentId: number) => void;
 };
 
 export function DocumentList({
@@ -14,6 +16,7 @@ export function DocumentList({
   onSelect,
   loading,
   onRefresh,
+  onDelete,
 }: DocumentListProps) {
   const documentCount = documents.length;
   const hasDocuments = documentCount > 0;
@@ -61,24 +64,49 @@ export function DocumentList({
             {documents.map((doc) => {
               const isActive = selectedDocumentId === String(doc.id);
               return (
-                <button
+                <div
                   key={doc.id}
-                  type="button"
-                  className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition ${
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
                     isActive
                       ? "border-black bg-neutral-100 shadow-sm dark:border-white dark:bg-neutral-800"
                       : "border-neutral-200 hover:border-black dark:border-neutral-800 dark:hover:border-white"
                   }`}
-                  onClick={() => onSelect(String(doc.id))}
                 >
-                  <p className="font-medium truncate">
-                    {doc.title || doc.fileName}
-                  </p>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                    {doc.fileType.toUpperCase()} · {doc.chunkCount} chunk
-                    {doc.chunkCount === 1 ? "" : "s"}
-                  </p>
-                </button>
+                  <button
+                    type="button"
+                    className="flex-1 text-left"
+                    onClick={() => onSelect(String(doc.id))}
+                  >
+                    <p className="font-medium truncate">
+                      {doc.title || doc.fileName}
+                    </p>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                      {doc.fileType.toUpperCase()} · {doc.chunkCount} chunk
+                      {doc.chunkCount === 1 ? "" : "s"}
+                    </p>
+                  </button>
+                  {onDelete && (
+                    <button
+                      type="button"
+                      className="ml-1 flex h-6 w-6 items-center justify-center rounded-full text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      aria-label="Delete document"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const label =
+                          doc.title || doc.fileName || `Document ${doc.id}`;
+                        if (
+                          window.confirm(
+                            `Delete "${label}" and all of its chunks? This cannot be undone.`
+                          )
+                        ) {
+                          onDelete(doc.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>

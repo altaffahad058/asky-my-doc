@@ -68,6 +68,36 @@ export function useDocuments() {
     [loadDocuments]
   );
 
+  const deleteDocument = useCallback(
+    async (documentId: number): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/documents/${documentId}`, {
+          method: "DELETE",
+        });
+        const data = await res.json().catch(() => ({} as any));
+
+        if (!res.ok) {
+          const message =
+            (data && (data.error || data.message)) ||
+            "Failed to delete document";
+          throw new Error(message);
+        }
+
+        await loadDocuments();
+
+        if (String(documentId) === selectedDocumentId) {
+          setSelectedDocumentId("");
+        }
+
+        return true;
+      } catch (error: any) {
+        console.error("Failed to delete document", error);
+        return false;
+      }
+    },
+    [loadDocuments, selectedDocumentId]
+  );
+
   useEffect(() => {
     loadDocuments();
   }, [loadDocuments]);
@@ -91,6 +121,7 @@ export function useDocuments() {
       loadDocuments,
       isUploading,
       uploadDocument,
+      deleteDocument,
     }),
     [
       documents,
@@ -99,6 +130,7 @@ export function useDocuments() {
       loadDocuments,
       isUploading,
       uploadDocument,
+      deleteDocument,
     ]
   );
 }

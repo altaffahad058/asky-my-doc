@@ -26,6 +26,7 @@ export default function HomeClient({ userFullName }: HomeClientProps) {
     loadDocuments,
     isUploading,
     uploadDocument,
+    deleteDocument,
   } = useDocuments();
   const {
     messages,
@@ -64,6 +65,23 @@ export default function HomeClient({ userFullName }: HomeClientProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages.length]);
+
+  async function handleDeleteDocument(documentId: number) {
+    const doc = documents.find((d) => d.id === documentId);
+    const label = doc?.title || doc?.fileName || `Document ${documentId}`;
+    const messageId = appendAssistantMessage(
+      `🗑️ Deleting "${label}" and its chunks…`
+    );
+
+    const ok = await deleteDocument(documentId);
+
+    updateMessageContent(
+      messageId,
+      ok
+        ? `✅ Deleted "${label}" and its chunks.\n\nEmbeddings in the vector database were also deleted.`
+        : `❌ Failed to delete "${label}". Please try again later.`
+    );
+  }
 
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const inputEl = e.currentTarget;
@@ -162,6 +180,7 @@ export default function HomeClient({ userFullName }: HomeClientProps) {
             onSelect={setSelectedDocumentId}
             loading={documentsLoading}
             onRefresh={loadDocuments}
+            onDelete={handleDeleteDocument}
           />
         </div>
       </section>
