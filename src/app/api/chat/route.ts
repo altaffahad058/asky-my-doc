@@ -82,8 +82,8 @@ export async function POST(req: Request) {
       const trimmedMessage = message.trim();
 
       const embeddingsClient = new CohereEmbeddings({
-        apiKey: process.env.COHERE_API_KEY!,
-        model: process.env.COHERE_EMBED_MODEL ?? "embed-english-v3.0",
+        apiKey: aiConfig.apiKey!,
+        model: embeddingConfig.model,
       });
 
       const pineconeIndex = getPineconeIndex();

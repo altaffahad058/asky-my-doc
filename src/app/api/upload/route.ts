@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUserId } from "@/lib/auth";
 import { prisma } from '@/lib/db';
 import { embeddingConfig } from '@/lib/embeddings';
+import { aiConfig } from '@/lib/ai';
 import { pineconeConfig, getPineconeIndex } from '@/lib/pinecone';
 import { Document as LangChainDocument } from "@langchain/core/documents";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
@@ -164,8 +165,8 @@ export async function POST(req: Request) {
         console.log(`Generating embeddings for ${result.chunks.length} chunks via LangChain...`);
 
         const embeddingsClient = new CohereEmbeddings({
-          apiKey: process.env.COHERE_API_KEY!,
-          model: process.env.COHERE_EMBED_MODEL ?? "embed-english-v3.0",
+          apiKey: aiConfig.apiKey!,
+          model: embeddingConfig.model,
         });
 
         const pineconeIndex = getPineconeIndex();

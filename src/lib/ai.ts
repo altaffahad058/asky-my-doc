@@ -58,12 +58,13 @@ export async function chatRequest(
   }
 }
 
-// Export configuration for debugging
+// Export configuration for debugging and shared usage
 export const aiConfig = {
   chatModel: COHERE_CHAT_MODEL,
   embedModel: COHERE_EMBED_MODEL,
   apiBase: COHERE_API_BASE,
   hasApiKey: Boolean(COHERE_API_KEY),
+  apiKey: COHERE_API_KEY,
   keyPreview: COHERE_API_KEY ? `${COHERE_API_KEY.substring(0, 8)}...` : "NOT_SET"
 };
 
