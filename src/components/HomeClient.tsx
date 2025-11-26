@@ -38,6 +38,8 @@ export default function HomeClient({ userFullName }: HomeClientProps) {
     resetChat,
     appendAssistantMessage,
     updateMessageContent,
+    fetchReferences,
+    isFetchingReferences,
   } = useChat({ selectedDocumentId, documents });
 
   async function onLogout(e: React.FormEvent) {
@@ -124,43 +126,45 @@ export default function HomeClient({ userFullName }: HomeClientProps) {
   }
 
   return (
-    <div className="flex justify-center">
-      <div className="flex flex-col gap-8">
-        <HomeHeader loggingOut={loggingOut} onLogout={onLogout} />
+    <div className="flex w-full flex-col gap-8">
+      <HomeHeader loggingOut={loggingOut} onLogout={onLogout} />
 
-        {/* Main Content */}
-        <section className="grid gap-6 md:grid-cols-12">
-          {/* Left: Upload and Document List (4 cols) */}
-          <div className="md:col-span-4 order-2 md:order-none flex flex-col gap-6">
-            <UploadCard
-              fileInputRef={fileInputRef}
-              isUploading={isUploading}
-              onFileChange={onFileChange}
-              userFullName={userFullName}
-            />
-            <DocumentList
-              documents={documents}
-              selectedDocumentId={selectedDocumentId}
-              onSelect={setSelectedDocumentId}
-              loading={documentsLoading}
-              onRefresh={loadDocuments}
-            />
-          </div>
-          {/* Right: Chat (8 cols) */}
-          <ChatPane
-            messages={messages}
-            listRef={listRef}
-            input={input}
-            onInputChange={setInput}
-            isSending={isSending}
-            canCompose={canCompose}
-            canSend={canSend}
-            onSend={onSend}
-            onKeyDown={onKeyDown}
-            onResetChat={resetChat}
+      {/* Main Content */}
+      <section className="grid w-full gap-6 md:grid-cols-12">
+        {/* Chat (8 cols) */}
+        <ChatPane
+          messages={messages}
+          listRef={listRef}
+          input={input}
+          onInputChange={setInput}
+          isSending={isSending}
+          canCompose={canCompose}
+          canSend={canSend}
+          onSend={onSend}
+          onKeyDown={onKeyDown}
+          onResetChat={resetChat}
+          onFetchReferences={fetchReferences}
+          canFetchReferences={canCompose && !isFetchingReferences}
+          isFetchingReferences={isFetchingReferences}
+        />
+
+        {/* Sidebar (4 cols) */}
+        <div className="md:col-span-4 order-2 md:order-none flex flex-col gap-6">
+          <UploadCard
+            fileInputRef={fileInputRef}
+            isUploading={isUploading}
+            onFileChange={onFileChange}
+            userFullName={userFullName}
           />
-        </section>
-      </div>
+          <DocumentList
+            documents={documents}
+            selectedDocumentId={selectedDocumentId}
+            onSelect={setSelectedDocumentId}
+            loading={documentsLoading}
+            onRefresh={loadDocuments}
+          />
+        </div>
+      </section>
     </div>
   );
 }

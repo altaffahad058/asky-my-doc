@@ -7,6 +7,7 @@ AskMyDocs is an end-to-end AI assistant for your personal knowledge base. Users 
 - 🔐 **Full-stack auth** – email/password signup, login, logout, password reset, and signed session cookies (`src/app/api/auth/*`, `src/lib/auth.ts`).
 - 📂 **Document ingestion pipeline** – server-side parsing (PDF, DOCX, TXT), LangChain chunking, Prisma persistence, Cohere embeddings, Pinecone vector storage (`src/app/api/upload/route.ts`, `src/lib/embeddings.ts`, `src/lib/pinecone.ts`).
 - 💬 **Contextual chat workspace** – the chat route performs scoped Pinecone searches before calling Cohere; the UI enforces document selection and surfaces context usage (`src/app/api/chat/route.ts`, `src/hooks/useChat.ts`, `src/components/home/ChatPane.tsx`).
+- 🌐 **Optional web references** – one-click summaries feed Tavily web search to surface related public articles alongside the chat (`src/app/api/documents/[id]/references/route.ts`, `src/lib/summaries.ts`, `src/lib/references.ts`).
 - 🗂️ **Document dashboard** – `/api/documents` returns user uploads with chunk counts, powering the sidebar picker and upload refresh (`src/app/api/documents/route.ts`, `src/hooks/useDocuments.ts`, `src/components/home/DocumentList.tsx`).
 - 🧱 **Typed data layer** – Prisma schema for `User` (first/last/occupation fields), `Document`, and `Chunk`, with migrations under `prisma/migrations`.
 - 💅 **Modern UI** – Next.js App Router, React 19, Tailwind CSS 4, and a single-page chat/workspace experience in `src/components/HomeClient.tsx`.
@@ -27,9 +28,10 @@ AskMyDocs is an end-to-end AI assistant for your personal knowledge base. Users 
 ```
 Browser (HomeClient)
    ├─ Auth pages: (auth)/login, signup, forgot-password
-   ├─ Document list sidebar ← /api/documents (JSON)
-   ├─ Upload form → /api/upload (multipart/form-data)
-   └─ Chat composer (requires selected document) → /api/chat (JSON)
+   ├─ Document list sidebar ← /api/documents
+   ├─ Upload form → /api/upload
+   ├─ Chat composer (requires selected document) → /api/chat
+   └─ “Get references” button → /api/documents/[id]/references
 
 /api/upload
    1. Verify session via getSessionUserId()
@@ -47,9 +49,13 @@ Browser (HomeClient)
 
 /api/documents
    - Returns the user’s uploads with chunk counts for UI selection/state.
-```
 
-## Getting Started
+/api/documents/[id]/references
+   1. Verify session + document ownership
+   2. Summarize the document into a single searchable sentence (Cohere)
+   3. Call Tavily Search with the summary (or custom query)
+   4. Return formatted references to the chat UI
+```
 
 ### 1. Prerequisites
 
@@ -57,63 +63,28 @@ Browser (HomeClient)
 - PostgreSQL database
 - Pinecone account + index (dim: 1024, metric: cosine)
 - Cohere API key
+- Tavily API key
 
-> **Note**: `src/lib/ai.ts` throws during import if `COHERE_API_KEY` is missing, so the server will fail to boot until it is set.
+### 2. Configure environment
 
-### 2. Install dependencies
-
-```bash
-npm install
-```
-
-### 3. Configure environment
-
-Create `.env.local` (or populate your deployment secrets):
+Create `.env.local` with:
 
 ```bash
-# Required
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/askmydocs?schema=public"
 AUTH_SECRET="generate-a-long-random-string"
 
 COHERE_API_KEY="co_..."
-COHERE_API_BASE="https://api.cohere.ai/v1"            # optional override
-COHERE_CHAT_MODEL="command-a-03-2025"                 # optional override
-COHERE_EMBED_MODEL="embed-english-v3.0"               # optional override
+COHERE_API_BASE="https://api.cohere.ai/v1"
+COHERE_CHAT_MODEL="command-a-03-2025"
+COHERE_EMBED_MODEL="embed-english-v3.0"
 
 PINECONE_API_KEY="pc_..."
 PINECONE_INDEX_NAME="ask-my-docs-embeddings"
 
-# Optional tuning
-NODE_ENV="development"
+TAVILY_API_KEY="tvly_..."
 ```
 
-> **Tips**
-> - `AUTH_SECRET` must be at least 32 random bytes (use `openssl rand -base64 32`).
-> - Pinecone index must already exist with 1,024 dimensions to match Cohere’s embeddings.
-
-### 4. Initialize the database
-
-```bash
-npx prisma migrate dev
-npx prisma generate        # generally run automatically by migrate
-# Optional: inspect data
-npx prisma studio
-```
-
-### 5. Run the app
-
-```bash
-# Development
-npm run dev
-
-# Production build
-npm run build
-npm start
-```
-
-Visit `http://localhost:3000` to sign up, upload documents, and start chatting.
-
-## Document Ingestion Details
+## 3. Document Ingestion Details
 
 - **Uploads**: handled by `/api/upload` (Node runtime). Files larger than 5 MB or unsupported types (`.txt`, `.pdf`, `.docx`) are rejected before parsing begins.
 - **Parsing**: `pdf-parse` for PDF, `mammoth` for DOCX, UTF-8 decoding for TXT. Failures surface descriptive hints (`error` + `hint` fields) in the JSON response.
@@ -121,7 +92,7 @@ Visit `http://localhost:3000` to sign up, upload documents, and start chatting.
 - **Storage**: Documents + plain-text chunks live in PostgreSQL; embeddings live only in Pinecone under namespace `user-{userId}`, referencing `chunkId`.
 - **Resilience**: if embedding generation fails, the API warns the caller but keeps the document/chunks so you can retry vectorization later.
 
-## Chat Retrieval Flow
+## 4. Chat Retrieval Flow
 
 1. `useChat` enforces document selection and posts `{ message, documentId }` to `/api/chat`.
 2. Route ensures the user session exists (cookie JWT) and validates the payload.
@@ -130,7 +101,25 @@ Visit `http://localhost:3000` to sign up, upload documents, and start chatting.
 5. `chatRequest()` calls Cohere Chat with the prompt and returns `{ reply, contextUsed, sourcesCount }`.
 6. The UI appends 📚 / ℹ️ badges that explain whether document context powered the answer.
 
-## API Surface
+## 5. Web Reference Fetching
+
+When users click **Get references** in the chat pane, the app fetches publicly available articles that resemble the selected document:
+
+1. `useChat.fetchReferences()` verifies a document is selected and appends a placeholder assistant message (“Summarizing and fetching references…”).
+2. The API route `/api/documents/[id]/references` checks ownership, then:
+   - Summarizes the document into a single search-ready sentence using Cohere.
+   - Calls the Tavily Search API with that summary (or a custom query if supplied) to retrieve up to 5 links.
+   - Returns the summary plus normalized references (title, snippet, url, source host).
+3. The placeholder chat message is replaced with a compact list:
+   - `📝 Search summary` blockquote describing the document.
+   - Numbered references (title + host, single-line snippet, link arrow).
+
+### 6. Configuration & Costs
+
+- Requires `TAVILY_API_KEY` in `.env.local`. The free plan (5k requests/month) is usually enough for personal projects.
+- No external data flows into the main RAG pipeline; references are purely informational chat messages so users can open links manually.
+
+## 7. API Surface
 
 | Route | Method | Purpose |
 |-------|--------|---------|
@@ -141,41 +130,4 @@ Visit `http://localhost:3000` to sign up, upload documents, and start chatting.
 | `/api/documents` | GET | List the user’s uploaded documents + chunk totals. |
 | `/api/upload` | POST (multipart) | Parse, chunk, embed, and persist a document. |
 | `/api/chat` | POST | Contextual chat grounded in the selected document. |
-
-All routes require `getSessionUserId()` unless noted otherwise.
-
-## Useful npm Scripts
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start Next.js in development mode. |
-| `npm run build` | Create production build. |
-| `npm start` | Run built app. |
-| `npm run lint` | Run ESLint with the project config. |
-| `npm run prisma:migrate` | Apply Prisma migrations (`prisma migrate dev`). |
-| `npm run prisma:generate` | Regenerate Prisma client. |
-| `npm run prisma:reset` | Reset DB (`prisma migrate reset`). |
-| `npm run prisma:studio` | Open Prisma Studio. |
-
-## Deployment Notes
-
-- **Vercel**: Works well with Next.js App Router. Keep `/api/upload` on the Node.js runtime (already forced via `export const runtime = "nodejs"`). Store `.env` secrets in Vercel project settings.
-- **Background jobs**: Large documents may take a few seconds while embeddings are generated. Consider queueing + background processing if you need higher throughput.
-- **Security**: All sensitive values (DB URL, API keys) must be server-side only. Do not expose them via `NEXT_PUBLIC_*`.
-- **Pinecone limits**: Upsertion is batched by 100 vectors per request. Adjust `batchSize` if Pinecone limits change.
-
-## Troubleshooting
-
-- **“AI API key not configured”** – ensure `COHERE_API_KEY` is set before calling `/api/chat` or `/api/upload`.
-- **“Pinecone not configured”** – check both `PINECONE_API_KEY` and `PINECONE_INDEX_NAME`.
-- **Embeddings fail after upload** – verify the Pinecone index dimension (1024) and region match your environment settings.
-- **Auth SECRET errors** – set `AUTH_SECRET` in every environment (dev/prod). Tokens are invalidated if the secret changes.
-- **File parsing issues** – the upload API returns detailed hints (e.g., min 50 characters, 5 MB cap). Log output in the server console is useful for debugging.
-
-## Next Steps & Ideas
-
-- Persist and paginate chat history per user/document pairing.
-- Add UI for browsing uploaded documents and manual semantic search results.
-- Support additional file types (HTML, Markdown) or external data connectors.
-- Add background re-embedding jobs when models are updated.
-- Integrate email delivery for password resets instead of the current two-step API.
+| `/api/documents/[id]/references` | POST | Summarize the document, query Tavily, and return web references (opt-in). |

@@ -23,6 +23,7 @@ export function useChat({ selectedDocumentId, documents }: UseChatArgs) {
   ]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [isFetchingReferences, setIsFetchingReferences] = useState(false);
 
   const canCompose = selectedDocumentId.trim().length > 0;
   const canSend = canCompose && !isSending && input.trim().length > 0;
@@ -135,6 +136,101 @@ export function useChat({ selectedDocumentId, documents }: UseChatArgs) {
     selectedDocumentId,
   ]);
 
+  const fetchReferences = useCallback(async () => {
+    const trimmedId = selectedDocumentId.trim();
+    const documentIdPayload = trimmedId.length > 0 ? Number(trimmedId) : NaN;
+    if (!Number.isFinite(documentIdPayload)) {
+      appendAssistantMessage(
+        "ℹ️ Please select a document before fetching references."
+      );
+      return;
+    }
+
+    const selectedDocument = documents.find(
+      (doc) => doc.id === documentIdPayload
+    );
+    const docLabel =
+      selectedDocument?.title ||
+      selectedDocument?.fileName ||
+      `Document ${documentIdPayload}`;
+
+    const placeholderId = appendAssistantMessage(
+      `🔎 Summarizing "${docLabel}" and fetching references…`
+    );
+
+    try {
+      setIsFetchingReferences(true);
+      const res = await fetch(`/api/documents/${documentIdPayload}/references`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const message =
+          (data && (data.error || data.message)) ||
+          `Request failed (${res.status})`;
+        updateMessageContent(placeholderId, `❌ ${message}`);
+        return;
+      }
+
+      const summaryLine =
+        typeof data?.querySummary === "string" && data.querySummary.length > 0
+          ? data.querySummary
+          : data?.queryUsed || docLabel;
+      const references = Array.isArray(data?.references)
+        ? data.references
+        : [];
+
+      const formatSnippet = (snippet?: string) => {
+        if (!snippet) return null;
+        const singleLine = snippet.replace(/\s+/g, " ").trim();
+        if (!singleLine) return null;
+        return singleLine.length > 220
+          ? `${singleLine.slice(0, 217)}…`
+          : singleLine;
+      };
+
+      const formattedReferences =
+        references.length > 0
+          ? references
+              .map((ref: any, index: number) => {
+                const title = ref.title || ref.url || `Result ${index + 1}`;
+                const sourceTag = ref.source ? ` (${ref.source})` : "";
+                const snippet = formatSnippet(ref.snippet);
+                const lines = [
+                  `${index + 1}. ${title}${sourceTag}`,
+                  snippet ? `   • ${snippet}` : null,
+                  ref.url ? `   ↗ ${ref.url}` : null,
+                ].filter(Boolean);
+                return lines.join("\n");
+              })
+              .join("\n\n")
+          : "No matching web references were found.";
+
+      const messageParts = [
+        `📝 Search summary:\n> ${summaryLine}`,
+        references.length > 0
+          ? `🔗 Web references:\n${formattedReferences}`
+          : "🔗 No matching web references were found.",
+      ].filter(Boolean);
+
+      updateMessageContent(placeholderId, messageParts.join("\n\n"));
+    } catch (error: any) {
+      updateMessageContent(
+        placeholderId,
+        `❌ ${error?.message || "Failed to fetch web references."}`
+      );
+    } finally {
+      setIsFetchingReferences(false);
+    }
+  }, [
+    appendAssistantMessage,
+    documents,
+    selectedDocumentId,
+    updateMessageContent,
+  ]);
+
   return useMemo(
     () => ({
       messages,
@@ -147,6 +243,8 @@ export function useChat({ selectedDocumentId, documents }: UseChatArgs) {
       resetChat,
       appendAssistantMessage,
       updateMessageContent,
+      fetchReferences,
+      isFetchingReferences,
     }),
     [
       appendAssistantMessage,
@@ -154,9 +252,11 @@ export function useChat({ selectedDocumentId, documents }: UseChatArgs) {
       canSend,
       input,
       isSending,
+      isFetchingReferences,
       messages,
       resetChat,
       sendMessage,
+      fetchReferences,
       updateMessageContent,
     ]
   );

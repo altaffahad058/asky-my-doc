@@ -7,3 +7,12 @@ export type DocumentSummary = {
   chunkCount: number;
 };
 
+export type WebReference = {
+  title: string;
+  url: string;
+  snippet: string;
+  source?: string;
+  fetchedAt: string;
+  score?: number;
+};
+

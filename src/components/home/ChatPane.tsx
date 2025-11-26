@@ -12,6 +12,9 @@ type ChatPaneProps = {
   onSend: (e?: React.FormEvent) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onResetChat: () => void;
+  onFetchReferences: () => void;
+  canFetchReferences: boolean;
+  isFetchingReferences: boolean;
 };
 
 export function ChatPane({
@@ -25,20 +28,33 @@ export function ChatPane({
   onSend,
   onKeyDown,
   onResetChat,
+  onFetchReferences,
+  canFetchReferences,
+  isFetchingReferences,
 }: ChatPaneProps) {
   return (
     <div className="md:col-span-8 order-1 md:order-none">
       <div className="panel flex h-[578px] flex-col">
         <div className="sticky top-0 z-10 -mx-6 -mt-6 mb-3 border-b border-neutral-200 bg-white px-6 py-4 dark:border-neutral-800 dark:bg-neutral-900">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm font-medium">Chat</p>
-            <button
-              className="text-sm underline-offset-4 hover:underline text-cyan-500"
-              type="button"
-              onClick={onResetChat}
-            >
-              Clear chat
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                className="text-sm underline-offset-4 hover:underline text-cyan-500 disabled:opacity-50"
+                type="button"
+                onClick={onFetchReferences}
+                disabled={!canFetchReferences}
+              >
+                {isFetchingReferences ? "Fetching refs…" : "Get references"}
+              </button>
+              <button
+                className="text-sm underline-offset-4 hover:underline text-cyan-500"
+                type="button"
+                onClick={onResetChat}
+              >
+                Clear chat
+              </button>
+            </div>
           </div>
         </div>
 
