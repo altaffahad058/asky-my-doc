@@ -37,7 +37,7 @@ export function ChatPane({
               type="button"
               onClick={onResetChat}
             >
-              New chat
+              Clear chat
             </button>
           </div>
         </div>

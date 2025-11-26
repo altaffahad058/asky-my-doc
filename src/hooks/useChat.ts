@@ -18,7 +18,7 @@ export function useChat({ selectedDocumentId, documents }: UseChatArgs) {
       id: "welcome-1",
       role: "assistant",
       content:
-        "Welcome to Ask My Doc! Upload your notes, articles, or books and ask questions. I'll answer based on your documents.",
+        "Welcome to Ask My Doc! Please upload your documents to get started.",
     },
   ]);
   const [input, setInput] = useState("");

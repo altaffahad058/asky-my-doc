@@ -9,7 +9,11 @@ import { DocumentList } from "./home/DocumentList";
 import { ChatPane } from "./home/ChatPane";
 import { UploadCard } from "./home/UploadCard";
 
-export default function HomeClient() {
+type HomeClientProps = {
+  userFullName?: string;
+};
+
+export default function HomeClient({ userFullName }: HomeClientProps) {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -120,40 +124,43 @@ export default function HomeClient() {
   }
 
   return (
-    <div className="flex w-full flex-col gap-8">
-      <HomeHeader loggingOut={loggingOut} onLogout={onLogout} />
+    <div className="flex w-full justify-center">
+      <div className="flex w-full max-w-6xl flex-col gap-8">
+        <HomeHeader loggingOut={loggingOut} onLogout={onLogout} />
 
-      {/* Main Content */}
-      <section className="grid gap-6 md:grid-cols-12">
-        <ChatPane
-          messages={messages}
-          listRef={listRef}
-          input={input}
-          onInputChange={setInput}
-          isSending={isSending}
-          canCompose={canCompose}
-          canSend={canSend}
-          onSend={onSend}
-          onKeyDown={onKeyDown}
-          onResetChat={resetChat}
-        />
-
-        {/* Right: Info (4 cols) */}
-        <div className="md:col-span-4 order-2 md:order-none flex flex-col gap-6">
-          <UploadCard
-            fileInputRef={fileInputRef}
-            isUploading={isUploading}
-            onFileChange={onFileChange}
+        {/* Main Content */}
+        <section className="grid gap-6 md:grid-cols-12">
+          {/* Left: Upload and Document List (4 cols) */}
+          <div className="md:col-span-4 order-2 md:order-none flex flex-col gap-6">
+            <UploadCard
+              fileInputRef={fileInputRef}
+              isUploading={isUploading}
+              onFileChange={onFileChange}
+              userFullName={userFullName}
+            />
+            <DocumentList
+              documents={documents}
+              selectedDocumentId={selectedDocumentId}
+              onSelect={setSelectedDocumentId}
+              loading={documentsLoading}
+              onRefresh={loadDocuments}
+            />
+          </div>
+          {/* Right: Chat (8 cols) */}
+          <ChatPane
+            messages={messages}
+            listRef={listRef}
+            input={input}
+            onInputChange={setInput}
+            isSending={isSending}
+            canCompose={canCompose}
+            canSend={canSend}
+            onSend={onSend}
+            onKeyDown={onKeyDown}
+            onResetChat={resetChat}
           />
-          <DocumentList
-            documents={documents}
-            selectedDocumentId={selectedDocumentId}
-            onSelect={setSelectedDocumentId}
-            loading={documentsLoading}
-            onRefresh={loadDocuments}
-          />
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }
