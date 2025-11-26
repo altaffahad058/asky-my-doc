@@ -1,5 +1,5 @@
 import { DocumentSummary } from "@/types/documents";
-import { Trash2 } from "lucide-react";
+import { Trash2, RefreshCw } from "lucide-react";
 
 type DocumentListProps = {
   documents: DocumentSummary[];
@@ -22,17 +22,17 @@ export function DocumentList({
   const hasDocuments = documentCount > 0;
 
   return (
-    <div className="card flex h-[333px] flex-col gap-4">
+    <div className="card flex h-[337px] flex-col gap-4">
       <header className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Your documents</h2>
           <button
             type="button"
-            className="text-sm underline-offset-4 hover:underline text-cyan-500 disabled:opacity-50"
+            className="inline-flex items-center gap-1 text-sm underline-offset-4 hover:underline text-cyan-500 disabled:opacity-50"
             onClick={onRefresh}
             disabled={loading}
           >
-            {loading ? "Refreshing…" : "Refresh"}
+            <RefreshCw className="h-5 w-5 cursor-pointer" aria-hidden="true" />
           </button>
         </div>
         <p className="text-sm text-neutral-500 dark:text-neutral-400">
@@ -74,10 +74,10 @@ export function DocumentList({
                 >
                   <button
                     type="button"
-                    className="flex-1 text-left"
+                    className="flex-1 text-left overflow-hidden"
                     onClick={() => onSelect(String(doc.id))}
                   >
-                    <p className="font-medium truncate">
+                    <p className="font-medium break-words">
                       {doc.title || doc.fileName}
                     </p>
                     <p className="text-xs text-neutral-500 dark:text-neutral-400">

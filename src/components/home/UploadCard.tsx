@@ -1,4 +1,5 @@
 import { ChangeEvent, MutableRefObject } from "react";
+import { Upload } from "lucide-react";
 
 type UploadCardProps = {
   fileInputRef: MutableRefObject<HTMLInputElement | null>;
@@ -35,11 +36,12 @@ export function UploadCard({
         />
         <button
           type="button"
-          className="button cursor-pointer"
+          className="button cursor-pointer flex items-center justify-center gap-2"
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploading}
+          aria-label={isUploading ? "Uploading document…" : "Upload document"}
         >
-          {isUploading ? "Uploading…" : "Upload document"}
+          <Upload className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
     </div>
