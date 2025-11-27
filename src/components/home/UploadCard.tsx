@@ -23,8 +23,7 @@ export function UploadCard({
       <h1 className="text-2xl">{heading}</h1>
       <p className="muted mt-2">
         Upload text documents like notes, articles, or books. Then chat to
-        extract insights, summarize sections, find references, or get direct
-        answers grounded in your content.
+        extract insights, summarize sections, or find references.<br /> (Accepted file types are .txt, .pdf, .docx)
       </p>
       <div className="mt-4 flex items-center gap-3">
         <input
