@@ -5,11 +5,24 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
-  const [step, setStep] = useState<"email" | "reset">("email");
-  const [message, setMessage] = useState<string | null>(null);
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [state, setState] = useState<{
+    email: string;
+    step: "email" | "reset";
+    message: string | null;
+    newPassword: string;
+    confirmPassword: string;
+    localError: string | null;
+  }>({
+    email: "",
+    step: "email",
+    message: null,
+    newPassword: "",
+    confirmPassword: "",
+    localError: null,
+  });
+
+  const { email, step, message, newPassword, confirmPassword, localError } =
+    state;
   const {
     forgotPassword,
     resetPassword,
@@ -17,39 +30,55 @@ export default function ForgotPasswordPage() {
     error,
     clearError,
   } = useAuth();
-  const [localError, setLocalError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLocalError(null);
-    setMessage(null);
+    setState((prev) => ({
+      ...prev,
+      localError: null,
+      message: null,
+    }));
     clearError();
 
     const result = await forgotPassword(email);
     if (result) {
       if (result.exists) {
-        setStep("reset");
-        setMessage(null);
+        setState((prev) => ({
+          ...prev,
+          step: "reset",
+          message: null,
+        }));
       } else {
-        setMessage(
-          "If an account exists for that email, you can reset the password."
-        );
+        setState((prev) => ({
+          ...prev,
+          message:
+            "If an account exists for that email, you can reset the password.",
+        }));
       }
     }
   }
 
   async function onReset(e: React.FormEvent) {
     e.preventDefault();
-    setLocalError(null);
-    setMessage(null);
+    setState((prev) => ({
+      ...prev,
+      localError: null,
+      message: null,
+    }));
     clearError();
 
     if (newPassword.length < 8) {
-      setLocalError("Password must be at least 8 characters");
+      setState((prev) => ({
+        ...prev,
+        localError: "Password must be at least 8 characters",
+      }));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setLocalError("Passwords do not match");
+      setState((prev) => ({
+        ...prev,
+        localError: "Passwords do not match",
+      }));
       return;
     }
 
@@ -74,7 +103,9 @@ export default function ForgotPasswordPage() {
                 <input
                   className="input"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) =>
+                    setState((prev) => ({ ...prev, email: e.target.value }))
+                  }
                   type="email"
                   required
                 />
@@ -98,7 +129,12 @@ export default function ForgotPasswordPage() {
                 <input
                   className="input"
                   value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
+                  onChange={(e) =>
+                    setState((prev) => ({
+                      ...prev,
+                      newPassword: e.target.value,
+                    }))
+                  }
                   type="password"
                   required
                 />
@@ -108,7 +144,12 @@ export default function ForgotPasswordPage() {
                 <input
                   className="input"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) =>
+                    setState((prev) => ({
+                      ...prev,
+                      confirmPassword: e.target.value,
+                    }))
+                  }
                   type="password"
                   required
                 />

@@ -4,7 +4,7 @@ AskMyDocs is an end-to-end AI assistant for your personal knowledge base. Users 
 
 ## Highlights
 
-- 🔐 **Full-stack auth** – email/password signup, login, logout, password reset, and signed session cookies (`src/app/api/auth/*`, `src/lib/auth.ts`).
+- 🔐 **Full-stack auth** – email/password signup, login, logout, and password reset powered by Auth.js (NextAuth) (`src/auth.ts`, `src/app/api/auth/[...nextauth]`, `src/hooks/useAuth.ts`).
 - 📂 **Document ingestion pipeline** – server-side parsing (PDF, DOCX, TXT), LangChain chunking, Prisma persistence, Cohere embeddings, Pinecone vector storage (`src/app/api/upload/route.ts`, `src/lib/embeddings.ts`, `src/lib/pinecone.ts`).
 - 💬 **Contextual chat workspace** – the chat route performs scoped Pinecone searches before calling Cohere; the UI enforces document selection and surfaces context usage (`src/app/api/chat/route.ts`, `src/hooks/useChat.ts`, `src/components/home/ChatPane.tsx`).
 - 🌐 **Optional web references** – one-click summaries feed Tavily web search to surface related public articles alongside the chat (`src/app/api/documents/[id]/references/route.ts`, `src/lib/summaries.ts`, `src/lib/references.ts`).
@@ -123,9 +123,8 @@ When users click **Get references** in the chat pane, the app fetches publicly a
 
 | Route | Method | Purpose |
 |-------|--------|---------|
-| `/api/auth/signup` | POST | Create account + session cookie (bcrypt + Prisma). |
-| `/api/auth/login` | POST | Email/password login and session creation. |
-| `/api/auth/logout` | POST | Clears session cookie. |
+| `/api/auth/signup` | POST | Create account (bcrypt + Prisma). Client auto-signs in via Auth.js credentials provider. |
+| `/api/auth/[...nextauth]` | GET/POST | Auth.js (NextAuth) handlers powering email/password login + logout. |
 | `/api/auth/forgot-password` | POST | Two-step reset (email existence check, then password update). |
 | `/api/documents` | GET | List the user’s uploaded documents + chunk totals. |
 | `/api/upload` | POST (multipart) | Parse, chunk, embed, and persist a document. |

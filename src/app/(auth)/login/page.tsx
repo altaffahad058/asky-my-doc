@@ -5,8 +5,11 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [state, setState] = useState<{ email: string; password: string }>({
+    email: "",
+    password: "",
+  });
+  const { email, password } = state;
   const { login, isLoggingIn, error } = useAuth();
 
   async function onSubmit(e: React.FormEvent) {
@@ -25,7 +28,9 @@ export default function LoginPage() {
             <input
               className="input"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, email: e.target.value }))
+              }
               type="email"
               required
             />
@@ -35,12 +40,14 @@ export default function LoginPage() {
             <input
               className="input"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) =>
+                setState((prev) => ({ ...prev, password: e.target.value }))
+              }
               type="password"
               required
             />
           </div>
-          <button className="button" disabled={isLoggingIn} type="submit">
+          <button className="button cursor-pointer" disabled={isLoggingIn} type="submit">
             {isLoggingIn ? "Signing in..." : "Sign in"}
           </button>
         </form>

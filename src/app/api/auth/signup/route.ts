@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { createSession } from '@/lib/auth';
 
 const schema = z.object({
 	firstName: z.string().min(1).max(60),
@@ -29,8 +28,6 @@ export async function POST(req: Request) {
 			data: { email, passwordHash, firstName, lastName, occupation },
 			select: { id: true, email: true, firstName: true, lastName: true, occupation: true },
 		});
-
-		await createSession(user.id);
 
 		return NextResponse.json({ user }, { status: 201 });
 	} catch (err: any) {

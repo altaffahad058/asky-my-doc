@@ -4,16 +4,17 @@ import { useEffect, useRef } from "react";
 import { useDocuments } from "@/hooks/useDocuments";
 import { useChat } from "@/hooks/useChat";
 import { useAuth } from "@/hooks/useAuth";
+import { useSessionUser } from "@/contexts/SessionContext";
 import { HomeHeader } from "./home/HomeHeader";
 import { DocumentList } from "./home/DocumentList";
 import { ChatPane } from "./home/ChatPane";
 import { UploadCard } from "./home/UploadCard";
 
-type HomeClientProps = {
-  userFullName?: string;
-};
-
-export default function HomeClient({ userFullName }: HomeClientProps) {
+export default function HomeClient() {
+  const sessionUser = useSessionUser();
+  const userFullName =
+    [sessionUser?.firstName, sessionUser?.lastName].filter(Boolean).join(" ") ||
+    undefined;
   const { logout, isLoggingOut } = useAuth();
   const listRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);

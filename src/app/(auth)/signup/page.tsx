@@ -5,22 +5,41 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function SignupPage() {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [occupation, setOccupation] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [state, setState] = useState<{
+    firstName: string;
+    lastName: string;
+    occupation: string;
+    email: string;
+    password: string;
+    confirmPassword: string;
+    localError: string | null;
+  }>({
+    firstName: "",
+    lastName: "",
+    occupation: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    localError: null,
+  });
+  const {
+    firstName,
+    lastName,
+    occupation,
+    email,
+    password,
+    confirmPassword,
+    localError,
+  } = state;
   const { signup, isSigningUp, error, clearError } = useAuth();
-  const [localError, setLocalError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLocalError(null);
+    setState((prev) => ({ ...prev, localError: null }));
     clearError();
 
     if (password !== confirmPassword) {
-      setLocalError("Passwords do not match");
+      setState((prev) => ({ ...prev, localError: "Passwords do not match" }));
       return;
     }
 
@@ -40,7 +59,12 @@ export default function SignupPage() {
             <input
               className="input"
               value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
+              onChange={(e) =>
+                setState((prev) => ({
+                  ...prev,
+                  firstName: e.target.value,
+                }))
+              }
               required
             />
           </div>
@@ -49,7 +73,12 @@ export default function SignupPage() {
             <input
               className="input"
               value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
+              onChange={(e) =>
+                setState((prev) => ({
+                  ...prev,
+                  lastName: e.target.value,
+                }))
+              }
               required
             />
           </div>
@@ -58,7 +87,12 @@ export default function SignupPage() {
             <input
               className="input"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) =>
+                setState((prev) => ({
+                  ...prev,
+                  email: e.target.value,
+                }))
+              }
               type="email"
               required
             />
@@ -68,7 +102,12 @@ export default function SignupPage() {
             <input
               className="input"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) =>
+                setState((prev) => ({
+                  ...prev,
+                  password: e.target.value,
+                }))
+              }
               type="password"
               required
             />
@@ -78,7 +117,12 @@ export default function SignupPage() {
             <input
               className="input"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={(e) =>
+                setState((prev) => ({
+                  ...prev,
+                  confirmPassword: e.target.value,
+                }))
+              }
               type="password"
               required
             />
@@ -88,7 +132,12 @@ export default function SignupPage() {
             <input
               className="input"
               value={occupation}
-              onChange={(e) => setOccupation(e.target.value)}
+              onChange={(e) =>
+                setState((prev) => ({
+                  ...prev,
+                  occupation: e.target.value,
+                }))
+              }
               placeholder="e.g., Student, Developer"
               required
             />

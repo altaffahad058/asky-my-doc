@@ -1,6 +1,7 @@
 // src/hooks/useAuth.ts
 'use client';
 
+import { signIn, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useState, useCallback } from 'react';
 
@@ -33,22 +34,22 @@ export function useAuth() {
 		setIsLoggingIn(true);
 		setError(null);
 		try {
-			const res = await fetch('/api/auth/login', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(data),
+			const result = await signIn('credentials', {
+				redirect: false,
+				email: data.email,
+				password: data.password,
 			});
 
-			if (res.ok) {
-				router.push('/');
-				return true;
-			} else {
-				const responseData = await res.json();
-				setError(responseData.error ?? 'Login failed');
+			if (!result || result.error) {
+				setError(result?.error ?? 'Login failed');
 				return false;
 			}
-		} catch (err: any) {
-			setError(err?.message || 'Network error');
+
+			router.push('/');
+			return true;
+		} catch (err: unknown) {
+			const message = err instanceof Error && err.message ? err.message : 'Login failed';
+			setError(message);
 			return false;
 		} finally {
 			setIsLoggingIn(false);
@@ -65,16 +66,28 @@ export function useAuth() {
 				body: JSON.stringify(data),
 			});
 
-			if (res.ok) {
-				router.push('/');
-				return true;
-			} else {
+			if (!res.ok) {
 				const responseData = await res.json();
 				setError(responseData.error ?? 'Signup failed');
 				return false;
 			}
-		} catch (err: any) {
-			setError(err?.message || 'Network error');
+
+			const loginResult = await signIn('credentials', {
+				redirect: false,
+				email: data.email,
+				password: data.password,
+			});
+
+			if (!loginResult || loginResult.error) {
+				setError(loginResult?.error ?? 'Signup succeeded but auto-login failed');
+				return false;
+			}
+
+			router.push('/');
+			return true;
+		} catch (err: unknown) {
+			const message = err instanceof Error && err.message ? err.message : 'Signup failed';
+			setError(message);
 			return false;
 		} finally {
 			setIsSigningUp(false);
@@ -84,14 +97,12 @@ export function useAuth() {
 	const logout = useCallback(async (): Promise<void> => {
 		setIsLoggingOut(true);
 		try {
-			await fetch('/api/auth/logout', { method: 'POST' });
-			router.replace('/login');
-		} catch (err: any) {
+			await signOut({ redirect: false });
+		} catch (err: unknown) {
 			console.error('Logout error:', err);
-			// Still redirect even if the API call fails
-			router.replace('/login');
 		} finally {
 			setIsLoggingOut(false);
+			router.replace('/login');
 		}
 	}, [router]);
 
@@ -113,8 +124,9 @@ export function useAuth() {
 				setError(responseData.error ?? 'Request failed');
 				return null;
 			}
-		} catch (err: any) {
-			setError(err?.message || 'Network error');
+		} catch (err: unknown) {
+			const message = err instanceof Error && err.message ? err.message : 'Network error';
+			setError(message);
 			return null;
 		} finally {
 			setIsForgotPasswordLoading(false);
@@ -138,8 +150,9 @@ export function useAuth() {
 				setError(responseData.error ?? 'Failed to update password');
 				return false;
 			}
-		} catch (err: any) {
-			setError(err?.message || 'Network error');
+		} catch (err: unknown) {
+			const message = err instanceof Error && err.message ? err.message : 'Network error';
+			setError(message);
 			return false;
 		} finally {
 			setIsForgotPasswordLoading(false);
